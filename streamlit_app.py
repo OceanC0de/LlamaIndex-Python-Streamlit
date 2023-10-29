@@ -40,12 +40,12 @@ if not st.session_state.chat_started:
 else:
     # Display the selected slider values using st.metric
     col1, col2 = st.columns(2)
-    col1.metric(label="Selected Distance (km)", value=st.session_state.distance)
-    col2.metric(label="Selected Rating", value=st.session_state.rating)
+    col1.metric(label="Max. Distance to Power Tower(km)", value=st.session_state.distance)
+    col2.metric(label="Min. Star Rating", value=st.session_state.rating)
     # Initialize st.session_state.messages if not present
     if "messages" not in st.session_state:
         st.session_state.messages = [
-            {"role": "assistant", "content": "Pick your preferences above and ask me where you can go to escape the canteen"}
+            {"role": "assistant", "content": "Based on your preferences above, ask me what restaurants would make a good fit today"}
         ]
 
     @st.cache_resource(show_spinner=False)
@@ -58,15 +58,14 @@ else:
             docs = reader.load_data()
             service_context = ServiceContext.from_defaults(
                 llm=OpenAI(
-                    model="gpt-3.5-turbo", 
+                    model="gpt-4", 
                     temperature=0.5, 
                     system_prompt=(
                         f"You are an expert on the restaurants in Baden, Switzerland. Your job is to provide "
-                        f"information based on the restaurant database. Your users want to escape the canteen and find a restaurant "
+                        f"information based on the restaurant database. "
                         f"based on their criteria. The restaurants have a different distance to the Power Tower, the user wants max {distance} km), "
                         f"and rating (at least {rating}). Pick the restaurant that is below the max distance, has at least the minimum rating "
-                        f" Always pick one restaurant and provide as much info about it as possible. "
-                        f"Also, explain why you would prefer it over the canteen."
+                        f"Always pick one restaurant and say that it is below the max {distance} and has at least {rating} or more. Also, provide as much info about the restaurant as possible. "
                     )
                 )
             )
