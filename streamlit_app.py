@@ -6,47 +6,87 @@ from llama_index import SimpleDirectoryReader
 
 # Update page title and icon
 st.set_page_config(page_title="Chat with the Baden Restaurant Guide, powered by LlamaIndex", page_icon="🍽️", layout="centered", initial_sidebar_state="auto", menu_items=None)
-openai.api_key = st.secrets.openai_key
+openai.api_key = "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"
 # Update the title of the page
-st.title("Chat with the Baden Restaurant Guide, powered by LlamaIndex 💬🍽️")
+st.title("Chat with the Power Tower Chef 💬🍽️")
 
-if "messages" not in st.session_state.keys():  # Initialize the chat messages history
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Ask me a question about restaurants in Baden!"}
-    ]
 
-@st.cache_resource(show_spinner=False)
-def load_data():
-    # Update text and input directory path
-    with st.spinner(text="Loading and indexing the Baden Restaurant data – hang tight!"):
-        reader = SimpleDirectoryReader(input_dir="./data/kb/baden_restaurants", recursive=True)
-        docs = reader.load_data()
-        # Update the system prompt to match the new domain
-        service_context = ServiceContext.from_defaults(
-            llm=OpenAI(
-                model="gpt-3.5-turbo", 
-                temperature=0.5, 
-                system_prompt="You are an expert on the restaurants in Baden, Switzerland. Your job is to provide information based on the restaurant guide database. Keep your answers factual and based on the provided data – do not hallucinate features."
+if "chat_started" not in st.session_state:
+    st.session_state.chat_started = False
+
+if not st.session_state.chat_started:
+    distance = st.slider(
+        'Select maximum distance (km):',
+        min_value=0.0,
+        max_value=1.0,
+        value=0.5,
+        step=0.01
+    )
+    rating = st.slider(
+        'Select minimum rating:',
+        min_value=3.0,
+        max_value=5.0,
+        value=4.0,
+        step=0.1
+    )
+
+    def start_chat():
+        st.session_state.distance = distance
+        st.session_state.rating = rating
+        st.session_state.chat_started = True
+    
+    st.button('Start Chat', on_click=start_chat)
+
+else:
+    # Display the selected slider values using st.metric
+    col1, col2 = st.columns(2)
+    col1.metric(label="Selected Distance (km)", value=st.session_state.distance)
+    col2.metric(label="Selected Rating", value=st.session_state.rating)
+    # Initialize st.session_state.messages if not present
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {"role": "assistant", "content": "Pick your preferences above and ask me where you can go to escape the canteen"}
+        ]
+
+    @st.cache_resource(show_spinner=False)
+    def load_data():
+        # Use the stored values from session state here
+        distance = st.session_state.distance
+        rating = st.session_state.rating
+        with st.spinner(text="Loading and indexing the Baden Restaurant data – hang tight!"):
+            reader = SimpleDirectoryReader(input_dir="./data/kb/baden_restaurants", recursive=True)
+            docs = reader.load_data()
+            service_context = ServiceContext.from_defaults(
+                llm=OpenAI(
+                    model="gpt-3.5-turbo", 
+                    temperature=0.5, 
+                    system_prompt=(
+                        f"You are an expert on the restaurants in Baden, Switzerland. Your job is to provide "
+                        f"information based on the restaurant database. Your users want to escape the canteen and find a restaurant "
+                        f"based on their criteria. The restaurants have a different distance to the Power Tower, the user wants max {distance} km), "
+                        f"and rating (at least {rating}). Pick the restaurant that is below the max distance, has at least the minimum rating "
+                        f" Always pick one restaurant and provide as much info about it as possible. "
+                        f"Also, explain why you would prefer it over the canteen."
+                    )
+                )
             )
-        )
-        index = VectorStoreIndex.from_documents(docs, service_context=service_context)
-        return index
+            index = VectorStoreIndex.from_documents(docs, service_context=service_context)
+            return index
+            
+    index = load_data()
+    chat_engine = index.as_chat_engine(chat_mode="condense_question", verbose=True)
 
-index = load_data()
-chat_engine = index.as_chat_engine(chat_mode="condense_question", verbose=True)
+    if prompt := st.chat_input("Your question"):  
+        st.session_state.messages.append({"role": "user", "content": prompt})
 
-if prompt := st.chat_input("Your question"):  # Prompt for user input and save to chat history
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    for message in st.session_state.messages:  
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
 
-for message in st.session_state.messages:  # Display the prior chat messages
-    with st.chat_message(message["role"]):
-        st.write(message["content"])
-
-# If the last message is not from assistant, generate a new response
-if st.session_state.messages[-1]["role"] != "assistant":
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            response = chat_engine.chat(prompt)
-            st.write(response.response)
-            message = {"role": "assistant", "content": response.response}
-            st.session_state.messages.append(message)  # Add response to message history
+    if st.session_state.messages[-1]["role"] != "assistant":
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                response = chat_engine.chat(prompt)
+                st.write(response.response)
+                message = {"role": "assistant", "content": response.response}
+                st.session_state.messages.append(message)
