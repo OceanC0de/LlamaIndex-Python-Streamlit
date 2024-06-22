@@ -6,7 +6,7 @@ from llama_index import SimpleDirectoryReader
 
 # Update page title and icon
 st.set_page_config(page_title="Chat with the Baden Restaurant Guide, powered by LlamaIndex", page_icon="🍽️", layout="centered", initial_sidebar_state="auto", menu_items=None)
-openai.api_key = "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"
+openai.api_key = ""
 # Update the title of the page
 st.title("Chat with the Power Tower Chef 💬🍽️")
 
